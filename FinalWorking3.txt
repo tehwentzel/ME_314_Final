@@ -1,0 +1,246 @@
+Quit[];
+ωhat[ω_] := {{0,-ω[[3,1]],ω[[2,1]]},{ω[[3,1]],0,-ω[[1,1]]},{-ω[[2,1]],ω[[1,1]],0}};
+ωunhat[ωh_] := {{-ωh[[2,3]]},{-ωh[[1,2]]},{ωh[[1,3]]}};
+(*These don't work goodly
+Vhat[mat_] := FullSimplify[Inverse[mat]. D[mat,t]];*)
+Vunhat[V_] := {{V[[1,3]]},{V[[2,3]]},{V[[2,1]]}};
+(*V[g_]:=Vunhat[Vhat[g]];*)
+Inertia[m_,J_]:={{m,0,0},{0,m,0},{0,0,J}};
+KE[V_,I_] := First[First[.5*(Transpose[V].I).V]];
+EL[q_] := FullSimplify[D[D[L,q'[t]],t]-D[L,q[t]]];
+
+(*function to get the translation from 1 link to the other with the link lenght*)
+(*translates to midpoint in link*)
+gtrans[l_] := {{1,0,l/2},{0,1,0},{0,0,1}};
+gθ[θ_] = {{Cos[θ],-Sin[θ],0},{Sin[θ],Cos[θ],0},{0,0,1}};
+gfull[l1_,l2_,θ_] := gtrans[l1].gθ[θ].gtrans[l2];
+
+PE[gmat_,m_] := m*g*(gmat.{{0},{0},{1}})[[2,1]];
+(*tf transforms for each link*)
+g1=FullSimplify[gfull[0,l1,θ1[t]]];
+g2 = FullSimplify[g1.gfull[l1,l2,θ2[t]]];
+g3 = FullSimplify[g1.gfull[l1,l3,θ3[t]]];
+g4 = FullSimplify[g3.gfull[l3,l4,θ4[t]]];
+g5 = FullSimplify[g2.gfull[l2,l5,θ5[t]]];
+g6 = FullSimplify[g5.gfull[l5,l6,θ6[t]]];
+
+V1hat = FullSimplify[Inverse[g1].D[g1,t]];
+V2hat = FullSimplify[Inverse[g2].D[g2,t]];
+V3hat = FullSimplify[Inverse[g3].D[g3,t]];
+V4hat = FullSimplify[Inverse[g4].D[g4,t]];
+V5hat = FullSimplify[Inverse[g5].D[g5,t]];
+V6hat = FullSimplify[Inverse[g6].D[g6,t]];
+
+V1 = FullSimplify[Vunhat[V1hat]];
+V2 = FullSimplify[Vunhat[V2hat]];
+V3 = FullSimplify[Vunhat[V3hat]];
+V4 = FullSimplify[Vunhat[V4hat]];
+V5 = FullSimplify[Vunhat[V5hat]];
+V6 = FullSimplify[Vunhat[V6hat]];
+
+I1 = Inertia[m1,J1];
+I2 = Inertia[m2,J2];
+I3 = Inertia[m3,J3];
+I4 = Inertia[m4,J4];
+I5 = Inertia[m5,J5];
+I6 = Inertia[m6,J6];
+
+KE1 = KE[V1,I1];
+KE2 = KE[V2, I2];
+KE3= KE[V3,I3];
+KE4= KE[V4, I4];
+KE5= KE[V5,I5];
+KE6 = KE[V6, I6];
+KEtot = FullSimplify[KE1 + KE2 + KE3 + KE4 + KE5 + KE6];
+
+PE1 = PE[g1,m1];
+PE2 = PE[g2,m2];
+PE3 = PE[g3,m3];
+PE4= PE[g4,m4];
+PE5 = PE[g5,m5];
+PE6 = PE[g6,m6];
+PEtot = FullSimplify[PE1 + PE2 + PE3 + PE4 + PE5 + PE6];
+
+L = FullSimplify[KEtot - PEtot];
+EL1 = EL[θ1];
+EL2 = EL[θ2];
+EL3 = EL[θ3];
+EL4 = EL[θ4];
+EL5 = EL[θ5];
+EL6 = EL[θ6];
+
+Cfull = FullSimplify[g2.{{0},{0},{1}}-g4.{{l4/2},{0},{1}}];
+Cx = Cfull[[1,1]];
+Cy = Cfull[[2,1]];
+(*Define constraint forces as a vector*)
+Fcx = lam1[t]*Grad[Cx,{θ1[t],θ2[t],θ3[t],θ4[t],θ5[t],θ6[t]}];
+Fcy = lam2[t]*Grad[Cy,{θ1[t],θ2[t],θ3[t],θ4[t],θ5[t],θ6[t]}];
+
+(*Start with simplified models for the input force*)
+Fextθ1 = -k0*(θ1[t] + D[θ1[t],t]);
+WristForce = -k4*Min[{θ2[t],0}];
+Fextθ3 = FullSimplify[WristForce + k1*l3*Sin[θ3[t]]*Cos[θ3[t]]];
+Fextθ5 = FullSimplify[-FingerForce1+ k2*(l5*Cos[θ5[t]]+l6*Cos[θ5[t]+θ6[t]])];
+Fextθ6 = FullSimplify[-FingerForce2+ k3*(l6*Cos[θ6[t]])];
+
+(*Conditional Forces*)
+phiθ2 = θ2[t];
+Fcondθ2 = lamθ2[t];
+phiθ5 = θ5[t];
+Fcondθ5 = lamθ5[t];
+phiθ6 = θ6[t];
+Fcondθ6 = lamθ6[t];
+
+(*Get total external forces for each finger*)
+Fθ1 = FullSimplify[Fcx[[1]]+Fcy[[1]]+Fextθ1 ];
+Fθ2 = FullSimplify[Fcx[[2]]+Fcy[[2]]];
+Fθ3 = FullSimplify[Fcx[[3]]+Fcy[[3]]+Fextθ3];
+Fθ4 = FullSimplify[Fcx[[4]]+Fcy[[4]]];
+Fθ5 = FullSimplify[Fcx[[5]]+Fcy[[5]]+ Fextθ5 ];
+Fθ6 = FullSimplify[Fcx[[6]]+Fcy[[6]]+ Fextθ6];
+
+q= {θ1[t],θ2[t],θ3[t],θ4[t],θ5[t],θ6[t]};
+qdot = D[q,t];
+DL =Grad[L,qdot];
+H = FullSimplify[DL.qdot -L];
+
+(*First, some placeholder values*)
+g = 9.8;
+ρ1= 11;
+ρ2= 38.8;
+w1=.0635;
+w2 = .02;
+h = .01;
+l1  = .25;
+m1 = l1;
+J1  = l1;
+l2  = .08125;
+m2= l2;
+J2= l2;
+l3 = .75*l2;
+m3 = l3;
+J3=l3;
+l4  = .75*l2;
+m4 =l4;
+J4=l4;
+l5  = .043;
+m5 = l5;
+J5=l5;
+l6  = .0572;
+m6  = l6;
+J6 =l6;
+
+(*Force Constants*)
+k0 = 100;
+k1 = 5.3;
+k2 = 2.15;
+k3 =2.9;
+k4 = .28;
+FingerForce1 = .13;
+FingerForce2 = .13;
+
+(*initial conditions*)
+θ10 = 0;
+θ20 =-Pi/6;
+θ30 = Pi/4;
+θ50 = -Pi/12;
+θ60 = -Pi/10;
+θ40 = θ4[t]/.First[First[Sort[Solve[{Evaluate[{Cx/.{θ1[t]->θ10,θ2[t]->θ20,θ3[t]->θ30}}]==0}]]]];
+
+(*Equations for evaluating switch-mode system*)
+Freesys:=NDSolve[{EL1 == Fθ1 ,EL2==Fθ2,EL3==Fθ3,EL4==Fθ4,EL5==Fθ5,EL6==Fθ6,θ1[0]==θ10,θ2[0]==θ20,θ3[0]==θ30,θ4[0]==θ40,θ5[0]==θ50,θ6[0]==θ60,θ1'[0]==0,θ2'[0]==0,θ3'[0]==0,θ4'[0]==0,θ5'[0]==0,θ6'[0]==0,D[D[Cx,t],t]==0,D[D[Cy,t],t]==0,WhenEvent[θ2[t]-Pi/6,{Sow[{2,t,q,qdot}],"StopIntegration"}],WhenEvent[θ5[t],{Sow[{5,t,q,qdot}],"StopIntegration"}],WhenEvent[θ6[t],{Sow[{6,t,q,qdot}],"StopIntegration"}]},{θ1,θ2,θ3,θ4,θ5,θ6},{t,0,5}];
+
+No2sys[start_,qi_,qdoti_]:=NDSolve[{EL1 == Fθ1 ,EL2==Fθ2+Fcondθ2,EL3==Fθ3,EL4==Fθ4,EL5==Fθ5,EL6==Fθ6,θ1[start]==qi[[1]],θ2[start]==Pi/6,θ3[start]==qi[[3]],θ4[start]==qi[[4]],θ5[start]==qi[[5]],θ6[start]==qi[[6]],θ1'[start]==0,θ2'[start]==0,θ3'[start]==qdoti[[3]],θ4'[start]==0,θ5'[start]==qdoti[[5]],θ6'[start]==qdoti[[6]],D[D[Cx,t],t]==0,D[D[Cy,t],t]==0,D[D[phiθ2,t],t]==0,WhenEvent[θ5[t],{Sow[{5,t,q,qdot}],"StopIntegration"}],WhenEvent[θ6[t],{Sow[{6,t,q,qdot}],"StopIntegration"}]},{θ1,θ2,θ3,θ4,θ5,θ6},{t,start,5}]
+
+No5sys[start_,qi_,qdoti_]:=NDSolve[{EL1 == Fθ1 ,EL2==Fθ2,EL3==Fθ3,EL4==Fθ4,EL5==Fθ5+Fcondθ5,EL6==Fθ6,θ1[start]==qi[[1]],θ2[start]==qi[[2]],θ3[start]==qi[[3]],θ4[start]==qi[[4]],θ5[start]==0,θ6[start]==qi[[6]],θ1'[start]==qdoti[[1]],θ2'[start]==qdoti[[2]],θ3'[start]==qdoti[[3]],θ4'[start]==0,θ5'[start]==0,θ6'[start]==qdoti[[6]],D[D[Cx,t],t]==0,D[D[Cy,t],t]==0,D[D[phiθ5,t],t]==0,WhenEvent[θ2[t]-Pi/6,{Sow[{2,t,q,qdot}],"StopIntegration"}],WhenEvent[θ6[t],{Sow[{6,t,q,qdot}],"StopIntegration"}]},{θ1,θ2,θ3,θ4,θ5,θ6},{t,start,5}]
+
+No6sys[start_,qi_,qdoti_]:=NDSolve[{EL1 == Fθ1 ,EL2==Fθ2,EL3==Fθ3,EL4==Fθ4,EL5==Fθ5,EL6==Fθ6+Fcondθ6,θ1[start]==qi[[1]],θ2[start]==qi[[2]],θ3[start]==qi[[3]],θ4[start]==qi[[4]],θ5[start]==qdoti[[5]],θ6[start]==0,θ1'[start]==qdoti[[1]],θ2'[start]==qdoti[[2]],θ3'[start]==qdoti[[3]],θ4'[start]==0,θ5'[start]==qdoti[[5]],θ6'[start]==0,D[D[Cx,t],t]==0,D[D[Cy,t],t]==0,D[D[phiθ6,t],t]==0,WhenEvent[θ2[t]-Pi/6,{Sow[{2,t,q,qdot}],"StopIntegration"}],WhenEvent[θ5[t],{Sow[{5,t,q,qdot}],"StopIntegration"}]},{θ1,θ2,θ3,θ4,θ5,θ6},{t,start,5}]
+
+No52sys[start_,qi_,qdoti_]:=NDSolve[{EL1 == Fθ1 ,EL2==Fθ2+Fcondθ2,EL3==Fθ3,EL4==Fθ4,EL5==Fθ5+Fcondθ5,EL6==Fθ6,θ1[start]==qi[[1]],θ2[start]==Pi/6,θ3[start]==qi[[3]],θ4[start]==qi[[4]],θ5[start]==0,θ6[start]==qdoti[[6]],θ1'[start]==qdoti[[1]],θ2'[start]==0,θ3'[start]==qdoti[[3]],θ4'[start]==0,θ5'[start]==0,θ6'[start]==qdoti[[6]],D[D[Cx,t],t]==0,D[D[Cy,t],t]==0,D[D[phiθ5,t],t]==0,D[D[phiθ2,t],t]==0,WhenEvent[θ5[t],{Sow[{5,t,q,qdot}],"StopIntegration"}]},{θ1,θ2,θ3,θ4,θ5,θ6},{t,start,5}]
+
+No62sys[start_,qi_,qdoti_]:=NDSolve[{EL1 == Fθ1 ,EL2==Fθ2+Fcondθ2,EL3==Fθ3,EL4==Fθ4,EL5==Fθ5,EL6==Fθ6+Fcondθ6,θ1[start]==qi[[1]],θ2[start]==Pi/6,θ3[start]==qi[[3]],θ4[start]==qi[[4]],θ5[start]==qdoti[[5]],θ6[start]==0,θ1'[start]==qdoti[[1]],θ2'[start]==0,θ3'[start]==qdoti[[3]],θ4'[start]==0,θ5'[start]==qdoti[[5]],θ6'[start]==0,D[D[Cx,t],t]==0,D[D[Cy,t],t]==0,D[D[phiθ6,t],t]==0,D[D[phiθ2,t],t]==0,WhenEvent[θ5[t]+.01,{Sow[{5,t,q,qdot}],"StopIntegration"}]},{θ1,θ2,θ3,θ4,θ5,θ6},{t,start,5}]
+
+No56sys[start_,qi_,qdoti_]:=NDSolve[{EL1 == Fθ1 ,EL2==Fθ2,EL3==Fθ3,EL4==Fθ4,EL5==Fθ5+Fcondθ5,EL6==Fθ6+Fcondθ6,θ1[start]==qi[[1]],θ2[start]==qi[[2]],θ3[start]==qi[[3]],θ4[start]==qi[[4]],θ5[start]==0,θ6[start]==0,θ1'[start]==qdoti[[1]],θ2'[start]==qdoti[[2]],θ3'[start]==qdoti[[3]],θ4'[start]==0,θ5'[start]==0,θ6'[start]==0,D[D[Cx,t],t]==0,D[D[Cy,t],t]==0,D[D[phiθ5,t],t]==0,D[D[phiθ6,t],t]==0,WhenEvent[θ2[t]-Pi/6,{Sow[{2,t,q,qdot}],"StopIntegration"}]},{θ1,θ2,θ3,θ4,θ5,θ6},{t,start,10}]
+{Sol1,data1} = Reap[Freesys]
+Sol1=Sol1[[1]];
+t1 = data1[[1,1,2]];
+{Sol2,data2}=Reap[No6sys[t1,data1[[1,1,3]],data1[[1,1,4]]]]
+Sol2=Sol2[[1]];
+t2 =data2[[1,1,2]];
+Sol3=No56sys[t2,data2[[1,1,3]],data2[[1,1,4]]]
+t3 = 10;
+q1 = q/.Sol1;
+q2 = q/.Sol2;
+q3 = q/.First[Sol3];
+Q1[n_]=q1/.t->n;
+Q2[n_]=q2/.t->n;
+Q3[n_]=q3/.t->n;
+Q[n_]=Piecewise[{{Q1[n],n<=t1},{Q2[n],t1<n<=t2},{Q3[n],t2<t3}}];
+
+(*good*)
+G11 = g1/.Sol1;
+G12=g1/.Sol2;
+G13=g1/.First[Sol3];
+trans11[τ_]:=G11/.t->τ;
+trans12[τ_]:=G12/.t->τ;
+trans13[τ_]:=G13/.t->τ;
+trans1[n_]:=Piecewise[{{trans11[n],n<=t1},{trans12[n],t1<n<=t2},{trans13[n],t2<t3}}];
+
+
+G21 = g2/.Sol1;
+G22=g2/.Sol2;
+G23=g2/.First[Sol3];
+trans21[τ_]:=G21/.t->τ;
+trans22[τ_]:=G22/.t->τ;
+trans23[τ_]:=G23/.t->τ;
+trans2[n_]:=Piecewise[{{trans21[n],n<=t1},{trans22[n],t1<n<=t2},{trans23[n],t2<t3}}];
+
+G31 = g3/.Sol1;
+G32=g3/.Sol2;
+G33=g3/.First[Sol3];
+trans31[τ_]:=G31/.t->τ;
+trans32[τ_]:=G32/.t->τ;
+trans33[τ_]:=G33/.t->τ;
+trans3[n_]:=Piecewise[{{trans31[n],n<=t1},{trans32[n],t1<n<=t2},{trans33[n],t2<t3}}];
+
+G41 = g4/.Sol1;
+G42=g4/.Sol2;
+G43=g4/.First[Sol3];
+trans41[τ_]:=G41/.t->τ;
+trans42[τ_]:=G42/.t->τ;
+trans43[τ_]:=G43/.t->τ;
+trans4[n_]:=Piecewise[{{trans41[n],n<=t1},{trans42[n],t1<n<=t2},{trans43[n],t2<t3}}];
+
+G51 = g5/.Sol1;
+G52=g5/.Sol2;
+G53=g5/.First[Sol3];
+trans51[τ_]:=G51/.t->τ;
+trans52[τ_]:=G52/.t->τ;
+trans53[τ_]:=G53/.t->τ;
+trans5[n_]:=Piecewise[{{trans51[n],n<=t1},{trans52[n],t1<n<=t2},{trans53[n],t2<t3}}];
+
+G61 = g6/.Sol1;
+G62=g6/.Sol2;
+G63=g6/.First[Sol3];
+trans61[τ_]:=G61/.t->τ;
+trans62[τ_]:=G62/.t->τ;
+trans63[τ_]:=G63/.t->τ;
+trans6[n_]:=Piecewise[{{trans61[n],n<=t1},{trans62[n],t1<n<=t2},{trans63[n],t2<t3}}];
+
+R1=Rectangle[{-.5*l1,-.01},{.5*l1,.01}];
+R2=Rectangle[{-.5*l2,-.01},{.5*l2,.01}];
+R3=Rectangle[{-.5*l3,-.01},{.5*l3,.01}];
+R4=Rectangle[{-.5*l4,-.01},{.5*l4,.01}];
+R5=Rectangle[{-.5*l5,-.01},{.5*l5,.01}];
+R6=Rectangle[{-.5*l6,-.01},{.5*l6,.01}];
+
+r1[n_]:=GeometricTransformation[R1,TransformationFunction[trans1[n]]]
+r2[n_]:=GeometricTransformation[R2,TransformationFunction[trans2[n]]]
+r3[n_]:=GeometricTransformation[R3,TransformationFunction[trans3[n]]]
+r4[n_]:=GeometricTransformation[R4,TransformationFunction[trans4[n]]]
+r5[n_]:=GeometricTransformation[R5,TransformationFunction[trans5[n]]]
+r6[n_]:=GeometricTransformation[R6,TransformationFunction[trans6[n]]]
+
+viz[k_]:=Show[Graphics[r1[k],Axes->True,PlotRange->{{0,.5},{-.2,.2}}],Graphics[r2[k],Axes->True,PlotRange->{{0,.5},{-.2,.2}}],Graphics[r3[k],Axes->True,PlotRange->{{0,.5},{-.2,.2}}],Graphics[r4[k],Axes->True,PlotRange->{{0,.5},{-.2,.2}}],Graphics[r5[k],Axes->True,PlotRange->{{0,.5},{-.2,.2}}],Graphics[r6[k],Axes->True,PlotRange->{{0,.5},{-.2,.2}}]];
+
+m=Manipulate[viz[t],{t,0,10}]
